@@ -65,7 +65,7 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFFF3F5F8.toInt())
         }
         val logo = ImageView(this).apply {
-            setImageResource(R.drawable.ic_rio3flashpro)
+            setImageResource(R.drawable.rio3flashpro_logo)
             contentDescription = "Логотип Rio3FlashPro"
             scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = LinearLayout.LayoutParams(
