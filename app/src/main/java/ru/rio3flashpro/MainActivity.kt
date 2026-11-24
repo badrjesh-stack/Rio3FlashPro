@@ -6,6 +6,9 @@ import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothSocket
 import android.content.pm.PackageManager
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -14,6 +17,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
@@ -30,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var connectButton: Button
     private lateinit var readButton: Button
     private lateinit var codesButton: Button
+    private lateinit var firmwareButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,6 +72,7 @@ class MainActivity : Activity() {
         connectButton = makeButton("Подключить Bluetooth OBD2") { chooseDevice() }
         readButton = makeButton("Показать параметры двигателя") { readLiveData() }
         codesButton = makeButton("Прочитать ошибки двигателя") { readTroubleCodes() }
+        firmwareButton = makeButton("Выбрать файл прошивки и проверить") { chooseFirmwareFile() }
         values = TextView(this).apply {
             text = "Здесь появятся данные автомобиля."
             textSize = 16f
@@ -75,7 +81,7 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
         val note = TextView(this).apply {
-            text = "Важно: приложение пока выполняет диагностику через совместимый ELM327 Bluetooth. Функция прошивки ЭБУ не реализована. Не отключайте адаптер при работе двигателя."
+            text = "Важно: Bluetooth-диагностика сейчас рассчитана на совместимый ELM327. Проверка файла считает SHA-256, но не подтверждает совместимость с ЭБУ и не прошивает автомобиль. Scanmatik пока не подключён."
             textSize = 13f
             setPadding(4, 18, 4, 4)
         }
@@ -85,6 +91,7 @@ class MainActivity : Activity() {
         root.addView(connectButton, match())
         root.addView(readButton, match())
         root.addView(codesButton, match())
+        root.addView(firmwareButton, match())
         root.addView(values, match())
         root.addView(note, match())
         val scroll = ScrollView(this).apply { addView(root) }
@@ -99,6 +106,84 @@ class MainActivity : Activity() {
 
     private fun makeButton(label: String, action: () -> Unit) =
         Button(this).apply { text = label; setOnClickListener { action() } }
+
+    private fun chooseFirmwareFile() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        try {
+            startActivityForResult(intent, 52)
+        } catch (e: Exception) {
+            setStatus("Не удалось открыть выбор файла: ${e.message}")
+        }
+    }
+
+    @Deprecated("Using the platform document picker for compatibility with the current minimal app.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 52 || resultCode != RESULT_OK) return
+        val uri: Uri = data?.data ?: run {
+            setStatus("Файл не выбран.")
+            return
+        }
+        setStatus("Проверка выбранного файла…")
+        worker.execute {
+            var tempFile: File? = null
+            try {
+                val displayName = contentResolver.query(
+                    uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: "selected_firmware.bin"
+
+                val extension = displayName.substringAfterLast('.', "").lowercase()
+                    .takeIf { it.matches(Regex("^[a-z0-9]{1,8}$")) } ?: "unknown"
+                tempFile = File.createTempFile("rio3flash_", ".$extension", cacheDir)
+
+                val maxBytes = 64L * 1024L * 1024L
+                var copied = 0L
+                contentResolver.openInputStream(uri)?.use { source ->
+                    tempFile.outputStream().use { target ->
+                        val buffer = ByteArray(8192)
+                        while (true) {
+                            val count = source.read(buffer)
+                            if (count < 0) break
+                            copied += count
+                            if (copied > maxBytes) {
+                                throw IllegalArgumentException("Файл больше допустимых 64 МБ.")
+                            }
+                            target.write(buffer, 0, count)
+                        }
+                    }
+                } ?: throw IllegalStateException("Не удалось открыть выбранный файл.")
+
+                val result = ru.rio3flashpro.core.FirmwareFileInspector.inspect(tempFile)
+                result.fold(
+                    onSuccess = { report ->
+                        val sizeKb = report.sizeBytes / 1024.0
+                        runOnUiThread {
+                            values.text = "Файл: ${report.fileName}\nРазмер: ${"%.1f".format(sizeKb)} КБ\nSHA-256:\n${report.sha256}\n\n${report.formatStatus}\n\nЭто только базовая проверка файла. Совместимость с ЭБУ и контрольные суммы производителя не проверены."
+                            setStatus("Файл проверен; прошивка не выполнялась.")
+                        }
+                    },
+                    onFailure = { error ->
+                        runOnUiThread {
+                            values.text = "Файл не прошёл базовую проверку:\n${error.message}"
+                            setStatus("Проверка файла завершилась с замечанием.")
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                runOnUiThread {
+                    values.text = "Не удалось проверить файл:\n${e.message ?: "неизвестная ошибка"}"
+                    setStatus("Ошибка проверки файла.")
+                }
+            } finally {
+                try { tempFile?.delete() } catch (_: Exception) {}
+            }
+        }
+    }
 
     private fun chooseDevice() {
         if (Build.VERSION.SDK_INT >= 31 &&
@@ -179,7 +264,7 @@ class MainActivity : Activity() {
         setStatus("Чтение параметров…")
         worker.execute {
             try {
-                val rpm = parseHexResponse(command("010C"), "410C", 4)?.let { ((it[0] * 256 + it[1]) / 4).toString() } ?: "нет данных"
+                val rpm = parseHexResponse(command("010C"), "410C", 2)?.let { ((it[0] * 256 + it[1]) / 4).toString() } ?: "нет данных"
                 val speed = parseHexResponse(command("010D"), "410D", 1)?.get(0)?.toString() ?: "нет данных"
                 val temp = parseHexResponse(command("0105"), "4105", 1)?.get(0)?.let { (it - 40).toString() } ?: "нет данных"
                 runOnUiThread {
