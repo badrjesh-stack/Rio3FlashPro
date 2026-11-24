@@ -26,9 +26,6 @@ import java.util.concurrent.Executors
 class MainActivity : Activity() {
     private val worker = Executors.newSingleThreadExecutor()
     private val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-    private var socket: BluetoothSocket? = null
-    private var input: InputStream? = null
-    private var output: OutputStream? = null
     private lateinit var status: TextView
     private lateinit var values: TextView
     private lateinit var connectButton: Button
@@ -37,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var vinButton: Button
     private lateinit var firmwareButton: Button
     private lateinit var adaptationsButton: Button
+    private lateinit var disconnectButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +75,7 @@ class MainActivity : Activity() {
         vinButton = makeButton("Прочитать VIN автомобиля") { readVin() }
         firmwareButton = makeButton("Выбрать файл прошивки и проверить") { chooseFirmwareFile() }
         adaptationsButton = makeButton("Адаптации и сервисные функции") { showAdaptations() }
+        disconnectButton = makeButton("Отключить Bluetooth OBD2") { disconnect() }
         values = TextView(this).apply {
             text = "Здесь появятся данные автомобиля."
             textSize = 16f
@@ -98,6 +97,7 @@ class MainActivity : Activity() {
         root.addView(vinButton, match())
         root.addView(firmwareButton, match())
         root.addView(adaptationsButton, match())
+        root.addView(disconnectButton, match())
         root.addView(values, match())
         root.addView(note, match())
         val scroll = ScrollView(this).apply { addView(root) }
@@ -105,6 +105,7 @@ class MainActivity : Activity() {
         readButton.isEnabled = false
         codesButton.isEnabled = false
         vinButton.isEnabled = false
+        disconnectButton.isEnabled = false
     }
 
     private fun match() = LinearLayout.LayoutParams(
@@ -257,19 +258,26 @@ class MainActivity : Activity() {
         setStatus("Подключение к ${device.name ?: device.address}…")
         worker.execute {
             try {
-                socket?.close()
+                ObdSession.close()
                 val newSocket = device.createRfcommSocketToServiceRecord(sppUuid)
                 newSocket.connect()
-                socket = newSocket
-                input = newSocket.inputStream
-                output = newSocket.outputStream
+                ObdSession.socket = newSocket
+                ObdSession.input = newSocket.inputStream
+                ObdSession.output = newSocket.outputStream
+                ObdSession.deviceName = device.name ?: device.address
                 val init = listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0")
                 init.forEach { command(it) }
                 runOnUiThread {
-                    setStatus("Подключено: ${device.name ?: device.address}")
+                    try {
+                        startForegroundService(Intent(this, ObdForegroundService::class.java))
+                    } catch (serviceError: Exception) {
+                        setStatus("Bluetooth подключён, но фоновый режим не запущен: ${serviceError.message}")
+                    }
+                    setStatus("Подключено: ${device.name ?: device.address}. Фоновая сессия активна.")
                     readButton.isEnabled = true
                     codesButton.isEnabled = true
                     vinButton.isEnabled = true
+                    disconnectButton.isEnabled = true
                     values.text = "Адаптер подключён. Можно читать параметры и ошибки."
                 }
             } catch (e: Exception) {
@@ -280,8 +288,8 @@ class MainActivity : Activity() {
     }
 
     private fun command(cmd: String): String {
-        val out = output ?: throw IllegalStateException("Адаптер не подключён")
-        val ins = input ?: throw IllegalStateException("Нет входящего потока")
+        val out = ObdSession.output ?: throw IllegalStateException("Адаптер не подключён")
+        val ins = ObdSession.input ?: throw IllegalStateException("Нет входящего потока")
         out.write((cmd + "\r").toByteArray(Charsets.US_ASCII))
         out.flush()
         val buffer = StringBuilder()
@@ -403,14 +411,22 @@ class MainActivity : Activity() {
     }
 
     private fun closeConnection() {
-        try { socket?.close() } catch (_: Exception) {}
-        socket = null
-        input = null
-        output = null
+        ObdSession.close()
+    }
+
+    private fun disconnect() {
+        closeConnection()
+        stopService(Intent(this, ObdForegroundService::class.java))
+        readButton.isEnabled = false
+        codesButton.isEnabled = false
+        vinButton.isEnabled = false
+        disconnectButton.isEnabled = false
+        setStatus("Адаптер отключён вручную.")
+        values.text = "Bluetooth-соединение закрыто."
     }
 
     override fun onDestroy() {
-        closeConnection()
+        // Keep the OBD session alive when Android recreates the Activity in background.
         worker.shutdownNow()
         super.onDestroy()
     }
