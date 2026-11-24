@@ -1,7 +1,7 @@
-<Window x:Class="Rio3FlashPro.Desktop.MainWindow"
+<Window x:Class="RioTech Pro.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Rio3FlashPro" Height="720" Width="1080"
+        Title="RioTech Pro" Height="720" Width="1080"
         MinHeight="600" MinWidth="900" Background="#F3F5F8">
     <Grid Margin="26">
         <Grid.RowDefinitions>
@@ -11,7 +11,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <StackPanel>
-            <TextBlock Text="Rio3FlashPro" FontSize="30" FontWeight="Bold" Foreground="#14243A"/>
+            <TextBlock Text="RioTech Pro" FontSize="30" FontWeight="Bold" Foreground="#14243A"/>
             <TextBlock Text="Kia Rio III · диагностика и управление сервисными сессиями" FontSize="15" Margin="0,6,0,0" Foreground="#526174"/>
         </StackPanel>
         <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="16" Margin="0,18,0,16">
@@ -53,6 +53,6 @@
                 </Grid>
             </Border>
         </Grid>
-        <TextBlock Grid.Row="3" Text="Rio3FlashPro · диагностический режим. Не выполняет запись в ЭБУ и не изменяет данные автомобиля." Margin="0,16,0,0" Foreground="#8A3C24" TextWrapping="Wrap"/>
+        <TextBlock Grid.Row="3" Text="RioTech Pro · диагностический режим. Не выполняет запись в ЭБУ и не изменяет данные автомобиля." Margin="0,16,0,0" Foreground="#8A3C24" TextWrapping="Wrap"/>
     </Grid>
 </Window>
