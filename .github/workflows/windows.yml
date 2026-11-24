@@ -1,0 +1,26 @@
+name: Build Windows Desktop
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "windows/**"
+      - "docs/**"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build Windows desktop client
+        run: dotnet build windows/Rio3FlashPro.Desktop/Rio3FlashPro.Desktop.csproj --configuration Release
