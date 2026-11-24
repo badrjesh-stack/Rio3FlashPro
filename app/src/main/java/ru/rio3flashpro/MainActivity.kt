@@ -106,7 +106,7 @@ class MainActivity : Activity() {
         supportedButton = makeButton("Проверить поддерживаемые параметры") { readSupportedPids() }
         clearCodesButton = makeButton("Сбросить ошибки двигателя") { confirmClearCodes() }
         firmwareButton = makeButton("Выбрать файл прошивки и проверить") { chooseFirmwareFile() }
-        adaptationsButton = makeButton("Адаптации и сервисные функции") { showAdaptations() }
+        adaptationsButton = makeButton("Дополнительные функции и адаптации (справка)") { showAdaptations() }
         disconnectButton = makeButton("Отключить Bluetooth OBD2") { disconnect() }
         values = TextView(this).apply {
             text = "Здесь появятся данные автомобиля."
@@ -124,7 +124,7 @@ class MainActivity : Activity() {
         root.addView(title, match())
         root.addView(subtitle, match())
         val vehicle = TextView(this).apply {
-            text = "Автомобиль: Kia Rio III, 2016\\nVIN из документов: $documentVin"
+            text = "Автомобиль: Kia Rio III, 2016\nVIN из документов: $documentVin"
             textSize = 14f
             setTextColor(0xFF174B3A.toInt())
             setPadding(14, 14, 14, 14)
@@ -163,16 +163,16 @@ class MainActivity : Activity() {
     private fun showAdaptations() {
         val items = arrayOf(
             "Идентификация ЭБУ двигателя (OBD-II)",
-            "Почему адаптации пока недоступны"
+            "Почему адаптация АКПП пока недоступна"
         )
         AlertDialog.Builder(this)
-            .setTitle("Адаптации Kia Rio III")
+            .setTitle("Дополнительные функции — справка")
             .setItems(items) { _, which ->
                 if (which == 0) {
                     readEcuIdentification()
                     return@setItems
                 }
-                val details = "Стандартный ELM327 и универсальный OBD-II не дают подтверждённого доступа к фирменным процедурам Kia, ABS и отдельному блоку АКПП. Программа не будет имитировать эти функции: нужны точные идентификаторы блоков, совместимый интерфейс и проверенная заводская процедура."
+                val details = "Сейчас RioTech Pro выполняет стандартную диагностику двигателя через OBD-II. Адаптация АКПП, сброс обученных значений и сервисные процедуры ABS этой версией НЕ выполняются. Bluetooth ELM327 V1.5 подтверждает связь с адаптером, но не подтверждает доступ к блоку коробки. Для разработки функции нужно сначала определить блок АКПП и проверить совместимый диагностический интерфейс и заводскую процедуру Kia."
                 AlertDialog.Builder(this)
                     .setTitle(items[which])
                     .setMessage("$details\n\nСтатус: пока информационный режим. Реальное выполнение будет включено только после проверки совместимости ЭБУ, адаптера и безопасной процедуры.")
