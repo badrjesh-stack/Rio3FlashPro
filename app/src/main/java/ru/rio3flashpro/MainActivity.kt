@@ -152,12 +152,16 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle("Адаптации Kia Rio III")
             .setItems(items) { _, which ->
+                if (which == 4) {
+                    readEcuIdentification()
+                    return@setItems
+                }
                 val details = when (which) {
                     0 -> "Процедура может требоваться после очистки или замены дроссельного узла. Нужны точный тип ЭБУ и заводская процедура. Сейчас команда не отправляется."
                     1 -> "Сброс доступен не для всех ЭБУ и не всегда необходим. Сначала нужно определить блок, прочитать его идентификаторы и проверить условия выполнения."
                     2 -> "Функции ABS зависят от блока и могут включать специальные процедуры с требованиями безопасности. Сейчас доступна только подготовка раздела."
                     3 -> "Поддержка зависит от наличия АКПП и конкретного блока управления коробкой. Тип коробки пока не подтверждён."
-                    else -> "Идентификаторы HW, SW и калибровки нельзя угадывать по году и объёму двигателя. Они будут показаны только после реального чтения поддерживаемым адаптером."
+                    else -> "Идентификация ЭБУ выполняется отдельным диагностическим запросом."
                 }
                 AlertDialog.Builder(this)
                     .setTitle(items[which])
@@ -405,6 +409,72 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread { setStatus("Ошибка чтения VIN: ${e.message}") }
+            }
+        }
+    }
+
+
+    /**
+     * Reads standard SAE J1979 Mode 09 identification records.
+     * PID 04 = Calibration ID, PID 06 = CVN, PID 0A = ECU name.
+     * These records do not necessarily expose hardware or software part numbers.
+     */
+    private fun readEcuIdentification() {
+        setStatus("Чтение идентификаторов ЭБУ через OBD-II Mode 09…")
+        worker.execute {
+            try {
+                val calRaw = command("0904")
+                val cvnRaw = command("0906")
+                val nameRaw = command("090A")
+
+                fun findPayload(raw: String, pid: String): String? {
+                    val hex = raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
+                    val marker = "49$pid"
+                    val index = hex.indexOf(marker)
+                    if (index < 0 || hex.length < index + 6) return null
+                    // One byte after the service/PID is the record count.
+                    return hex.substring(index + 6)
+                }
+
+                fun asciiRecord(raw: String, pid: String): String? {
+                    val payload = findPayload(raw, pid) ?: return null
+                    val chars = payload.chunked(2).mapNotNull { pair ->
+                        pair.takeIf { it.length == 2 }?.toIntOrNull(16)
+                    }.takeWhile { it != 0 }
+                        .filter { it in 0x20..0x7E }
+                        .map { it.toChar() }
+                        .joinToString("")
+                        .trim()
+                    return chars.takeIf { it.isNotBlank() }
+                }
+
+                val calibration = asciiRecord(calRaw, "04")
+                val ecuName = asciiRecord(nameRaw, "0A")
+                val cvnPayload = findPayload(cvnRaw, "06")
+                val cvn = cvnPayload?.take(8)?.takeIf { it.length == 8 }
+                    ?.chunked(2)?.joinToString(" ")?.takeIf { it.isNotBlank() }
+
+                val report = buildString {
+                    appendLine("Идентификация по стандартному OBD-II Mode 09")
+                    appendLine()
+                    appendLine("Calibration ID: ${calibration ?: "не поддерживается или не получен"}")
+                    appendLine("CVN: ${cvn ?: "не поддерживается или не получен"}")
+                    appendLine("Название ЭБУ: ${ecuName ?: "не поддерживается или не получено"}")
+                    appendLine()
+                    appendLine("Ответ PID 04: $calRaw")
+                    appendLine("Ответ PID 06: $cvnRaw")
+                    appendLine("Ответ PID 0A: $nameRaw")
+                    appendLine()
+                    append("Важно: стандартные запросы не гарантируют получение HW/SW-номеров и не идентифицируют отдельный блок АКПП. Отсутствие ответа не означает неисправность ЭБУ.")
+                }
+
+                runOnUiThread {
+                    values.text = report
+                    val found = calibration != null || cvn != null || ecuName != null
+                    setStatus(if (found) "Получены некоторые идентификаторы OBD-II" else "ЭБУ не вернул поддерживаемые записи Mode 09")
+                }
+            } catch (e: Exception) {
+                runOnUiThread { setStatus("Ошибка идентификации ЭБУ: ${e.message}") }
             }
         }
     }
