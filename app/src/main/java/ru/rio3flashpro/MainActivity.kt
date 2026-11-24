@@ -139,12 +139,13 @@ class MainActivity : Activity() {
 
                 val extension = displayName.substringAfterLast('.', "").lowercase()
                     .takeIf { it.matches(Regex("^[a-z0-9]{1,8}$")) } ?: "unknown"
-                tempFile = File.createTempFile("rio3flash_", ".$extension", cacheDir)
+                val outputFile = File.createTempFile("rio3flash_", ".$extension", cacheDir)
+                tempFile = outputFile
 
                 val maxBytes = 64L * 1024L * 1024L
                 var copied = 0L
                 contentResolver.openInputStream(uri)?.use { source ->
-                    tempFile.outputStream().use { target ->
+                    outputFile.outputStream().use { target ->
                         val buffer = ByteArray(8192)
                         while (true) {
                             val count = source.read(buffer)
@@ -158,7 +159,7 @@ class MainActivity : Activity() {
                     }
                 } ?: throw IllegalStateException("Не удалось открыть выбранный файл.")
 
-                val result = ru.rio3flashpro.core.FirmwareFileInspector.inspect(tempFile)
+                val result = ru.rio3flashpro.core.FirmwareFileInspector.inspect(outputFile)
                 result.fold(
                     onSuccess = { report ->
                         val sizeKb = report.sizeBytes / 1024.0
