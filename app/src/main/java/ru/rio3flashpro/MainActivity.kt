@@ -66,7 +66,7 @@ class MainActivity : Activity() {
         }
         val logo = ImageView(this).apply {
             setImageResource(R.drawable.rio3flashpro_logo)
-            contentDescription = "Логотип Rio3FlashPro"
+            contentDescription = "Логотип RioTech Pro"
             scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = LinearLayout.LayoutParams(
                 (144 * resources.displayMetrics.density).toInt(),
@@ -77,7 +77,7 @@ class MainActivity : Activity() {
             }
         }
         val title = TextView(this).apply {
-            text = "Rio3FlashPro"
+            text = "RioTech Pro"
             textSize = 28f
             setTextColor(0xFF14243A.toInt())
             gravity = Gravity.CENTER
