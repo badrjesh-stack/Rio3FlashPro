@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var connectButton: Button
     private lateinit var readButton: Button
     private lateinit var codesButton: Button
+    private lateinit var vinButton: Button
     private lateinit var firmwareButton: Button
     private lateinit var adaptationsButton: Button
 
@@ -73,6 +74,7 @@ class MainActivity : Activity() {
         connectButton = makeButton("Подключить Bluetooth OBD2") { chooseDevice() }
         readButton = makeButton("Показать параметры двигателя") { readLiveData() }
         codesButton = makeButton("Прочитать ошибки двигателя") { readTroubleCodes() }
+        vinButton = makeButton("Прочитать VIN автомобиля") { readVin() }
         firmwareButton = makeButton("Выбрать файл прошивки и проверить") { chooseFirmwareFile() }
         adaptationsButton = makeButton("Адаптации и сервисные функции") { showAdaptations() }
         values = TextView(this).apply {
@@ -93,6 +95,7 @@ class MainActivity : Activity() {
         root.addView(connectButton, match())
         root.addView(readButton, match())
         root.addView(codesButton, match())
+        root.addView(vinButton, match())
         root.addView(firmwareButton, match())
         root.addView(adaptationsButton, match())
         root.addView(values, match())
@@ -101,6 +104,7 @@ class MainActivity : Activity() {
         setContentView(scroll)
         readButton.isEnabled = false
         codesButton.isEnabled = false
+        vinButton.isEnabled = false
     }
 
     private fun match() = LinearLayout.LayoutParams(
@@ -265,6 +269,7 @@ class MainActivity : Activity() {
                     setStatus("Подключено: ${device.name ?: device.address}")
                     readButton.isEnabled = true
                     codesButton.isEnabled = true
+                    vinButton.isEnabled = true
                     values.text = "Адаптер подключён. Можно читать параметры и ошибки."
                 }
             } catch (e: Exception) {
@@ -323,6 +328,45 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread { setStatus("Ошибка чтения ошибок: ${e.message}") }
+            }
+        }
+    }
+
+    private fun readVin() {
+        setStatus("Запрос VIN через OBD-II Mode 09…")
+        worker.execute {
+            try {
+                // Mode 09 PID 02 is a standard VIN request, but not every ECU/adapter supports it.
+                val raw = command("0902")
+                val clean = raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
+                val marker = clean.indexOf("4902")
+                if (marker < 0 || clean.length < marker + 8) {
+                    runOnUiThread {
+                        values.text = "ЭБУ не вернул VIN через стандартный запрос OBD-II.\\nОтвет адаптера: $raw"
+                        setStatus("VIN не получен; это не означает неисправность.")
+                    }
+                    return@execute
+                }
+
+                // After 49 02 comes the record count byte (normally 01), then ASCII VIN bytes.
+                val payloadStart = marker + 8
+                val payload = clean.substring(payloadStart)
+                val bytes = payload.chunked(2).mapNotNull { it.toIntOrNull(16) }
+                val vin = bytes.mapNotNull { value ->
+                    if (value in 0x20..0x7E) value.toChar() else null
+                }.joinToString("").filter { it.isLetterOrDigit() }
+
+                val valid = vin.length == 17 && vin.all { it in "ABCDEFGHJKLMNPRSTUVWXYZ0123456789" }
+                runOnUiThread {
+                    values.text = if (valid) {
+                        "VIN автомобиля: $vin\\n\\nVIN прочитан стандартным запросом OBD-II Mode 09 PID 02."
+                    } else {
+                        "Ответ на запрос VIN получен, но его не удалось надёжно распознать.\\nСырой ответ: $raw"
+                    }
+                    setStatus(if (valid) "VIN успешно прочитан" else "VIN не подтверждён")
+                }
+            } catch (e: Exception) {
+                runOnUiThread { setStatus("Ошибка чтения VIN: ${e.message}") }
             }
         }
     }
