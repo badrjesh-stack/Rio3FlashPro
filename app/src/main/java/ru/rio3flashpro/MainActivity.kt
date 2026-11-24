@@ -280,12 +280,16 @@ class MainActivity : Activity() {
                 val init = listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0")
                 init.forEach { command(it) }
                 runOnUiThread {
-                    try {
+                    val backgroundStarted = try {
                         startForegroundService(Intent(this, ObdForegroundService::class.java))
+                        true
                     } catch (serviceError: Exception) {
                         setStatus("Bluetooth подключён, но фоновый режим не запущен: ${serviceError.message}")
+                        false
                     }
-                    setStatus("Подключено: ${device.name ?: device.address}. Фоновая сессия активна.")
+                    if (backgroundStarted) {
+                        setStatus("Подключено: ${device.name ?: device.address}. Фоновый режим включён.")
+                    }
                     readButton.isEnabled = true
                     codesButton.isEnabled = true
                     vinButton.isEnabled = true
