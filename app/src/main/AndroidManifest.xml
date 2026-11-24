@@ -6,6 +6,8 @@
     <application
         android:allowBackup="false"
         android:label="Rio3FlashPro"
+        android:icon="@drawable/ic_rio3flashpro"
+        android:roundIcon="@drawable/ic_rio3flashpro"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
         <activity
