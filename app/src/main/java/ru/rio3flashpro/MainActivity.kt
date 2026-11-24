@@ -14,7 +14,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.core.app.ActivityCompat
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
@@ -37,7 +36,7 @@ class MainActivity : Activity() {
         buildScreen()
         if (Build.VERSION.SDK_INT >= 31 &&
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 41)
+            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 41)
         }
     }
 
