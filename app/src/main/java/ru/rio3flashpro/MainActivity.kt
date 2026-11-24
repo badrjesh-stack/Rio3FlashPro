@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var firmwareButton: Button
     private lateinit var adaptationsButton: Button
     private lateinit var disconnectButton: Button
+    private lateinit var exportButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -108,6 +109,7 @@ class MainActivity : Activity() {
         firmwareButton = makeButton("Выбрать файл прошивки и проверить") { chooseFirmwareFile() }
         adaptationsButton = makeButton("Дополнительные функции и адаптации (справка)") { showAdaptations() }
         disconnectButton = makeButton("Отключить Bluetooth OBD2") { disconnect() }
+        exportButton = makeButton("Сохранить диагностический отчёт") { exportReport() }
         values = TextView(this).apply {
             text = "Здесь появятся данные автомобиля."
             textSize = 16f
@@ -141,6 +143,7 @@ class MainActivity : Activity() {
         root.addView(firmwareButton, match())
         root.addView(adaptationsButton, match())
         root.addView(disconnectButton, match())
+        root.addView(exportButton, match())
         root.addView(values, match())
         root.addView(note, match())
         val scroll = ScrollView(this).apply { addView(root) }
@@ -183,6 +186,19 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun exportReport() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TITLE, "RioTechPro-diagnostic-report.txt")
+        }
+        try {
+            startActivityForResult(intent, 53)
+        } catch (e: Exception) {
+            setStatus("Не удалось открыть сохранение отчёта: ${e.message}")
+        }
+    }
+
     private fun chooseFirmwareFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -198,7 +214,31 @@ class MainActivity : Activity() {
     @Deprecated("Using the platform document picker for compatibility with the current minimal app.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != 52 || resultCode != RESULT_OK) return
+        if (resultCode != RESULT_OK) return
+        if (requestCode == 53) {
+            val uri = data?.data ?: return
+            try {
+                contentResolver.openOutputStream(uri)?.use { stream ->
+                    val report = buildString {
+                        appendLine("RioTech Pro — диагностический отчёт")
+                        appendLine("Автомобиль: Kia Rio III, 2016")
+                        appendLine("VIN из документов: $documentVin")
+                        appendLine("Дата: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}")
+                        appendLine(status.text.toString())
+                        appendLine()
+                        appendLine(values.text.toString())
+                        appendLine()
+                        appendLine("Примечание: стандартный OBD-II отчёт не является полной проверкой ABS/АКПП и не подтверждает совместимость прошивки.")
+                    }
+                    stream.write(report.toByteArray(Charsets.UTF_8))
+                } ?: throw IllegalStateException("Не удалось открыть файл для записи.")
+                setStatus("Отчёт сохранён.")
+            } catch (e: Exception) {
+                setStatus("Не удалось сохранить отчёт: ${e.message}")
+            }
+            return
+        }
+        if (requestCode != 52) return
         val uri: Uri = data?.data ?: run {
             setStatus("Файл не выбран.")
             return
@@ -373,17 +413,17 @@ class MainActivity : Activity() {
         worker.execute {
             try {
                 val supported = linkedSetOf<Int>()
-                val report = StringBuilder("Поддерживаемые параметры SAE J1979\\n\\n")
+                val report = StringBuilder("Поддерживаемые параметры SAE J1979\n\n")
                 var base = 0
                 for (group in 0 until 4) {
                     val raw = command("01%02X".format(base))
                     val bytes = parseHexResponse(raw, "41%02X".format(base), 4)
                     report.append("Группа 0x%02X: ".format(base))
                     if (bytes == null) {
-                        report.append("нет ответа\\n")
+                        report.append("нет ответа\n")
                         break
                     }
-                    report.append("ответ получен\\n")
+                    report.append("ответ получен\n")
                     for (bit in 0 until 32) {
                         if ((bytes[bit / 8] and (1 shl (7 - bit % 8))) != 0) supported.add(base + bit + 1)
                     }
@@ -398,11 +438,11 @@ class MainActivity : Activity() {
                     0x2F to "Уровень топлива", 0x42 to "Напряжение ЭБУ",
                     0x46 to "Температура окружающего воздуха"
                 )
-                report.append("\\nОбнаруженные PID: ")
+                report.append("\nОбнаруженные PID: ")
                 report.append(if (supported.isEmpty()) "не определены" else supported.sorted().joinToString { "0x%02X".format(it) })
-                report.append("\\n\\nПоддерживаемые известные параметры:\\n")
-                labels.forEach { (pid, label) -> if (pid in supported) report.append("• $label (PID 0x%02X)\\n".format(pid)) }
-                report.append("\\nПоддержка PID не гарантирует доступность каждого значения при любых условиях.")
+                report.append("\n\nПоддерживаемые известные параметры:\n")
+                labels.forEach { (pid, label) -> if (pid in supported) report.append("• $label (PID 0x%02X)\n".format(pid)) }
+                report.append("\nПоддержка PID не гарантирует доступность каждого значения при любых условиях.")
                 runOnUiThread { values.text = report.toString(); setStatus("Проверка PID завершена") }
             } catch (e: Exception) {
                 runOnUiThread { setStatus("Ошибка проверки PID: ${e.message}") }
@@ -426,7 +466,7 @@ class MainActivity : Activity() {
                 val raw = command("04")
                 val accepted = raw.uppercase().replace("[^0-9A-F]".toRegex(), "").contains("44")
                 runOnUiThread {
-                    values.text = "Ответ на очистку (Mode 04):\\n$raw\\n\\n" +
+                    values.text = "Ответ на очистку (Mode 04):\n$raw\n\n" +
                         if (accepted) "ЭБУ подтвердил положительный ответ 44. Повторно прочитайте ошибки." else "Подтверждение 44 не обнаружено. Сброс не подтверждён."
                     setStatus(if (accepted) "Команда очистки подтверждена" else "Очистка не подтверждена")
                 }
@@ -529,7 +569,7 @@ class MainActivity : Activity() {
                 val nameRaw = command("090A")
 
                 fun findPayload(raw: String, pid: String): String? {
-                    val hex = raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
+                    val hex = normalizeElmHex(raw)
                     val marker = "49$pid"
                     val index = hex.indexOf(marker)
                     if (index < 0 || hex.length < index + 6) return null
@@ -580,15 +620,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun normalizeElmHex(raw: String): String {
+        val withoutFrameLabels = raw.replace(Regex("(?:^|\\s)\\d+\\s*:\\s*"), "")
+        return withoutFrameLabels.uppercase().replace("[^0-9A-F]".toRegex(), "")
+    }
+
     private fun parseHexResponse(raw: String, header: String, bytes: Int): List<Int>? {
-        val clean = raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
+        val clean = normalizeElmHex(raw)
         val index = clean.indexOf(header)
         if (index < 0 || clean.length < index + header.length + bytes * 2) return null
         return (0 until bytes).map { clean.substring(index + header.length + it * 2, index + header.length + it * 2 + 2).toInt(16) }
     }
 
     private fun decodeCodes(raw: String): List<String> {
-        val clean = raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
+        val clean = normalizeElmHex(raw)
         val start = clean.indexOf("43")
         if (start < 0) return emptyList()
         val data = clean.substring(start + 2)
