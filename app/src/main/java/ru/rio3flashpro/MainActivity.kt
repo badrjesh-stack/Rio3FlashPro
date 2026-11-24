@@ -492,12 +492,21 @@ class MainActivity : Activity() {
 
                 val valid = vin.length == 17 && vin.all { it in "ABCDEFGHJKLMNPRSTUVWXYZ0123456789" }
                 runOnUiThread {
-                    values.text = if (valid) {
-                        "VIN автомобиля: $vin\n\nVIN прочитан стандартным запросом OBD-II Mode 09 PID 02."
-                    } else {
-                        "Ответ на запрос VIN получен, но его не удалось надёжно распознать.\nСырой ответ: $raw"
+                    val comparison = when {
+                        !valid -> "Сравнение с VIN из документов: невозможно — VIN ЭБУ не распознан."
+                        vin == documentVin -> "СОВПАДЕНИЕ: VIN ЭБУ совпадает с VIN в документах."
+                        else -> "ВНИМАНИЕ: VIN ЭБУ НЕ совпадает с VIN в документах. Проверьте автомобиль и блок управления."
                     }
-                    setStatus(if (valid) "VIN успешно прочитан" else "VIN не подтверждён")
+                    values.text = if (valid) {
+                        "VIN из документов: $documentVin\nVIN из ЭБУ: $vin\n\n$comparison\n\nИсточник: OBD-II Mode 09 PID 02."
+                    } else {
+                        "VIN из документов: $documentVin\nОтвет на запрос VIN получен, но его не удалось надёжно распознать.\nСырой ответ: $raw\n\n$comparison"
+                    }
+                    setStatus(when {
+                        !valid -> "VIN ЭБУ не подтверждён"
+                        vin == documentVin -> "VIN ЭБУ совпадает с документами"
+                        else -> "Обнаружено несовпадение VIN"
+                    })
                 }
             } catch (e: Exception) {
                 runOnUiThread { setStatus("Ошибка чтения VIN: ${e.message}") }
