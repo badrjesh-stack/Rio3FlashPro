@@ -1,4 +1,4 @@
-# Rio3FlashPro
+# RioTech Pro
 
 Диагностический проект для Kia Rio III. Цель — создать Android-приложение и Windows-клиент с честно обозначенной поддержкой адаптеров и безопасным разделением диагностики и программирования ЭБУ.
 
@@ -12,7 +12,7 @@
 
 ## Сборка
 
-Android APK собирается workflow GitHub Actions: Actions → Build Android APK → скачать artifact `Rio3FlashPro-debug`.
+Android APK собирается workflow GitHub Actions: Actions → Build Android APK → скачать artifact `RioTechPro-debug`.
 
 Windows-клиент собирается workflow GitHub Actions: Actions → Build Windows Desktop. Для локальной сборки нужен .NET 8 SDK и Windows.
 
