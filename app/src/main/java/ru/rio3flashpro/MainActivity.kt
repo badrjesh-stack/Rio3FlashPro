@@ -342,7 +342,7 @@ class MainActivity : Activity() {
                 val marker = clean.indexOf("4902")
                 if (marker < 0 || clean.length < marker + 8) {
                     runOnUiThread {
-                        values.text = "ЭБУ не вернул VIN через стандартный запрос OBD-II.\\nОтвет адаптера: $raw"
+                        values.text = "ЭБУ не вернул VIN через стандартный запрос OBD-II.\nОтвет адаптера: $raw"
                         setStatus("VIN не получен; это не означает неисправность.")
                     }
                     return@execute
@@ -359,9 +359,9 @@ class MainActivity : Activity() {
                 val valid = vin.length == 17 && vin.all { it in "ABCDEFGHJKLMNPRSTUVWXYZ0123456789" }
                 runOnUiThread {
                     values.text = if (valid) {
-                        "VIN автомобиля: $vin\\n\\nVIN прочитан стандартным запросом OBD-II Mode 09 PID 02."
+                        "VIN автомобиля: $vin\n\nVIN прочитан стандартным запросом OBD-II Mode 09 PID 02."
                     } else {
-                        "Ответ на запрос VIN получен, но его не удалось надёжно распознать.\\nСырой ответ: $raw"
+                        "Ответ на запрос VIN получен, но его не удалось надёжно распознать.\nСырой ответ: $raw"
                     }
                     setStatus(if (valid) "VIN успешно прочитан" else "VIN не подтверждён")
                 }
