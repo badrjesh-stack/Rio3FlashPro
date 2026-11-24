@@ -451,7 +451,15 @@ class MainActivity : Activity() {
             try {
                 // Mode 09 PID 02 is a standard VIN request, but not every ECU/adapter supports it.
                 val raw = command("0902")
-                val clean = raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
+                // ELM327 may print multi-frame CAN replies as "0: HEX", "1: HEX", ...
+                // The decimal frame labels are not payload bytes and must not be joined to the VIN.
+                val frameHex = raw.lineSequence().mapNotNull { line ->
+                    val withoutLabel = line.trim().replace(Regex("^\\d+\\s*:\\s*"), "")
+                    val hex = withoutLabel.uppercase().replace("[^0-9A-F]".toRegex(), "")
+                    hex.takeIf { it.isNotEmpty() }
+                }.joinToString("")
+                val clean = if (frameHex.isNotEmpty()) frameHex
+                    else raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
                 val marker = clean.indexOf("4902")
                 if (marker < 0 || clean.length < marker + 8) {
                     runOnUiThread {
@@ -461,13 +469,16 @@ class MainActivity : Activity() {
                     return@execute
                 }
 
-                // After 49 02 comes the record count byte (normally 01), then ASCII VIN bytes.
+                // 49 02 = positive response, next byte = record count, then ASCII VIN.
                 val payloadStart = marker + 8
                 val payload = clean.substring(payloadStart)
-                val bytes = payload.chunked(2).mapNotNull { it.toIntOrNull(16) }
-                val vin = bytes.mapNotNull { value ->
-                    if (value in 0x20..0x7E) value.toChar() else null
-                }.joinToString("").filter { it.isLetterOrDigit() }
+                val bytes = payload.chunked(2).mapNotNull { pair ->
+                    pair.takeIf { it.length == 2 }?.toIntOrNull(16)
+                }
+                val vin = bytes.takeWhile { it in 0x20..0x7E }
+                    .map { it.toChar() }
+                    .joinToString("")
+                    .trim()
 
                 val valid = vin.length == 17 && vin.all { it in "ABCDEFGHJKLMNPRSTUVWXYZ0123456789" }
                 runOnUiThread {
