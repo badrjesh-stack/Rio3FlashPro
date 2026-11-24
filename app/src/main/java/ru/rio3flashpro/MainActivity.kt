@@ -25,6 +25,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
+    private val documentVin = "Z94CB41BBHR406592"
     private val worker = Executors.newSingleThreadExecutor()
     private val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     private lateinit var status: TextView
@@ -122,6 +123,14 @@ class MainActivity : Activity() {
         root.addView(logo)
         root.addView(title, match())
         root.addView(subtitle, match())
+        val vehicle = TextView(this).apply {
+            text = "Автомобиль: Kia Rio III, 2016\\nVIN из документов: $documentVin"
+            textSize = 14f
+            setTextColor(0xFF174B3A.toInt())
+            setPadding(14, 14, 14, 14)
+            setBackgroundColor(0xFFE7F3EC.toInt())
+        }
+        root.addView(vehicle, match())
         root.addView(status, match())
         root.addView(connectButton, match())
         root.addView(readButton, match())
@@ -453,13 +462,13 @@ class MainActivity : Activity() {
                 val raw = command("0902")
                 // ELM327 may print multi-frame CAN replies as "0: HEX", "1: HEX", ...
                 // The decimal frame labels are not payload bytes and must not be joined to the VIN.
-                val frameHex = raw.lineSequence().mapNotNull { line ->
-                    val withoutLabel = line.trim().replace(Regex("^\\d+\\s*:\\s*"), "")
-                    val hex = withoutLabel.uppercase().replace("[^0-9A-F]".toRegex(), "")
-                    hex.takeIf { it.isNotEmpty() }
-                }.joinToString("")
-                val clean = if (frameHex.isNotEmpty()) frameHex
-                    else raw.uppercase().replace("[^0-9A-F]".toRegex(), "")
+                // Strip every numbered ELM frame label, including labels on a single line:
+                // "0: 4902... 1: ... 2: ...". Keep only the actual response bytes.
+                val withoutFrameLabels = raw.replace(
+                    Regex("(?:^|\\\\s)\\\\d+\\\\s*:\\\\s*"),
+                    ""
+                )
+                val clean = withoutFrameLabels.uppercase().replace("[^0-9A-F]".toRegex(), "")
                 val marker = clean.indexOf("4902")
                 if (marker < 0 || clean.length < marker + 8) {
                     runOnUiThread {
@@ -469,8 +478,9 @@ class MainActivity : Activity() {
                     return@execute
                 }
 
-                // 49 02 = positive response, next byte = record count, then ASCII VIN.
-                val payloadStart = marker + 8
+                // 49 02 = positive response; 01 is the record count (one byte).
+                // The 17 VIN ASCII bytes therefore begin at marker + 6 hex characters.
+                val payloadStart = marker + 6
                 val payload = clean.substring(payloadStart)
                 val bytes = payload.chunked(2).mapNotNull { pair ->
                     pair.takeIf { it.length == 2 }?.toIntOrNull(16)
