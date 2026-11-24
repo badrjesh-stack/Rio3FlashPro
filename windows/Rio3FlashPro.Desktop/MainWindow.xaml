@@ -1,0 +1,50 @@
+<Window x:Class="Rio3FlashPro.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rio3FlashPro" Height="620" Width="980"
+        MinHeight="520" MinWidth="820" Background="#F3F5F8">
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="Rio3FlashPro" FontSize="30" FontWeight="Bold" Foreground="#14243A"/>
+            <TextBlock Text="Kia Rio III · диагностика и управление сервисными сессиями" FontSize="15" Margin="0,6,0,0" Foreground="#526174"/>
+        </StackPanel>
+        <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="16" Margin="0,22,0,16">
+            <StackPanel>
+                <TextBlock Text="Проект автомобиля" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock Text="Kia Rio III · 2016 · 1.6 л — ожидается подтверждение идентификаторов ЭБУ" Margin="0,8,0,0"/>
+                <TextBlock Text="Интерфейс: Scanmatik 2 Pro (планируемая поддержка; подключение ещё не проверено)" Margin="0,5,0,0" Foreground="#526174"/>
+            </StackPanel>
+        </Border>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="3*"/>
+            </Grid.ColumnDefinitions>
+            <Border Background="White" CornerRadius="8" Padding="18" Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock Text="Рабочие разделы" FontSize="18" FontWeight="SemiBold"/>
+                    <Button Content="Подключение интерфейса" Margin="0,14,0,0" Height="38" IsEnabled="False"/>
+                    <Button Content="Идентификация ЭБУ" Margin="0,8,0,0" Height="38" IsEnabled="False"/>
+                    <Button Content="Журнал диагностики" Margin="0,8,0,0" Height="38" IsEnabled="False"/>
+                    <Button Content="Проверка файла прошивки" Margin="0,8,0,0" Height="38" IsEnabled="False"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Background="White" CornerRadius="8" Padding="18" Margin="12,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="Состояние проекта" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="Windows-клиент: интерфейс-заготовка" Margin="0,14,0,0"/>
+                    <TextBlock Text="Подключение Scanmatik: ещё не реализовано" Margin="0,8,0,0"/>
+                    <TextBlock Text="Чтение/запись ЭБУ: отключены до проверки конкретного блока и протокола" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="#9A4B18"/>
+                    <TextBlock Text="Следующий этап — официальный API/драйвер Scanmatik и получение идентификаторов ЭБУ." TextWrapping="Wrap" Margin="0,18,0,0" Foreground="#526174"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+        <TextBlock Grid.Row="3" Text="Безопасность: эта версия не выполняет запись в ЭБУ. Не используйте неизвестные файлы прошивок." Margin="0,18,0,0" Foreground="#8A3C24" TextWrapping="Wrap"/>
+    </Grid>
+</Window>
