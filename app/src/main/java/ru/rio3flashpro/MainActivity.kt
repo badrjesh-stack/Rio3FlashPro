@@ -465,7 +465,7 @@ class MainActivity : Activity() {
                 // Strip every numbered ELM frame label, including labels on a single line:
                 // "0: 4902... 1: ... 2: ...". Keep only the actual response bytes.
                 val withoutFrameLabels = raw.replace(
-                    Regex("(?:^|\\\\s)\\\\d+\\\\s*:\\\\s*"),
+                    Regex("(?:^|\\s)\\d+\\s*:\\s*"),
                     ""
                 )
                 val clean = withoutFrameLabels.uppercase().replace("[^0-9A-F]".toRegex(), "")
