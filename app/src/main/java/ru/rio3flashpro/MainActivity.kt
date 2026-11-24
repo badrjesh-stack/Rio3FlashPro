@@ -35,6 +35,7 @@ class MainActivity : Activity() {
     private lateinit var readButton: Button
     private lateinit var codesButton: Button
     private lateinit var firmwareButton: Button
+    private lateinit var adaptationsButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,6 +74,7 @@ class MainActivity : Activity() {
         readButton = makeButton("Показать параметры двигателя") { readLiveData() }
         codesButton = makeButton("Прочитать ошибки двигателя") { readTroubleCodes() }
         firmwareButton = makeButton("Выбрать файл прошивки и проверить") { chooseFirmwareFile() }
+        adaptationsButton = makeButton("Адаптации и сервисные функции") { showAdaptations() }
         values = TextView(this).apply {
             text = "Здесь появятся данные автомобиля."
             textSize = 16f
@@ -92,6 +94,7 @@ class MainActivity : Activity() {
         root.addView(readButton, match())
         root.addView(codesButton, match())
         root.addView(firmwareButton, match())
+        root.addView(adaptationsButton, match())
         root.addView(values, match())
         root.addView(note, match())
         val scroll = ScrollView(this).apply { addView(root) }
@@ -106,6 +109,34 @@ class MainActivity : Activity() {
 
     private fun makeButton(label: String, action: () -> Unit) =
         Button(this).apply { text = label; setOnClickListener { action() } }
+
+    private fun showAdaptations() {
+        val items = arrayOf(
+            "Обучение дроссельной заслонки",
+            "Сброс адаптаций двигателя",
+            "Сервисные функции ABS",
+            "Сервисные функции АКПП",
+            "Идентификация ЭБУ"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Адаптации Kia Rio III")
+            .setItems(items) { _, which ->
+                val details = when (which) {
+                    0 -> "Процедура может требоваться после очистки или замены дроссельного узла. Нужны точный тип ЭБУ и заводская процедура. Сейчас команда не отправляется."
+                    1 -> "Сброс доступен не для всех ЭБУ и не всегда необходим. Сначала нужно определить блок, прочитать его идентификаторы и проверить условия выполнения."
+                    2 -> "Функции ABS зависят от блока и могут включать специальные процедуры с требованиями безопасности. Сейчас доступна только подготовка раздела."
+                    3 -> "Поддержка зависит от наличия АКПП и конкретного блока управления коробкой. Тип коробки пока не подтверждён."
+                    else -> "Идентификаторы HW, SW и калибровки нельзя угадывать по году и объёму двигателя. Они будут показаны только после реального чтения поддерживаемым адаптером."
+                }
+                AlertDialog.Builder(this)
+                    .setTitle(items[which])
+                    .setMessage("$details\n\nСтатус: пока информационный режим. Реальное выполнение будет включено только после проверки совместимости ЭБУ, адаптера и безопасной процедуры.")
+                    .setPositiveButton("Понятно", null)
+                    .show()
+            }
+            .setNegativeButton("Закрыть", null)
+            .show()
+    }
 
     private fun chooseFirmwareFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
