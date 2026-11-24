@@ -33,6 +33,8 @@ class MainActivity : Activity() {
     private lateinit var readButton: Button
     private lateinit var codesButton: Button
     private lateinit var vinButton: Button
+    private lateinit var supportedButton: Button
+    private lateinit var clearCodesButton: Button
     private lateinit var firmwareButton: Button
     private lateinit var adaptationsButton: Button
     private lateinit var disconnectButton: Button
@@ -52,6 +54,8 @@ class MainActivity : Activity() {
         readButton.isEnabled = connected
         codesButton.isEnabled = connected
         vinButton.isEnabled = connected
+        supportedButton.isEnabled = connected
+        clearCodesButton.isEnabled = connected
         disconnectButton.isEnabled = connected
         if (connected) {
             setStatus("Подключено: ${ObdSession.deviceName ?: "ELM327"}. Фоновая сессия активна.")
@@ -98,6 +102,8 @@ class MainActivity : Activity() {
         readButton = makeButton("Показать параметры двигателя") { readLiveData() }
         codesButton = makeButton("Прочитать ошибки двигателя") { readTroubleCodes() }
         vinButton = makeButton("Прочитать VIN автомобиля") { readVin() }
+        supportedButton = makeButton("Проверить поддерживаемые параметры") { readSupportedPids() }
+        clearCodesButton = makeButton("Сбросить ошибки двигателя") { confirmClearCodes() }
         firmwareButton = makeButton("Выбрать файл прошивки и проверить") { chooseFirmwareFile() }
         adaptationsButton = makeButton("Адаптации и сервисные функции") { showAdaptations() }
         disconnectButton = makeButton("Отключить Bluetooth OBD2") { disconnect() }
@@ -109,7 +115,7 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
         val note = TextView(this).apply {
-            text = "Важно: Bluetooth-диагностика сейчас рассчитана на совместимый ELM327. Проверка файла считает SHA-256, но не подтверждает совместимость с ЭБУ и не прошивает автомобиль. Scanmatik пока не подключён."
+            text = "OBD-II: стандартная диагностика двигателя через ELM327. Доступ к ABS, АКПП и фирменным адаптациям Kia зависит от блока и интерфейса. SHA-256 не подтверждает совместимость прошивки. Запись ЭБУ отключена."
             textSize = 13f
             setPadding(4, 18, 4, 4)
         }
@@ -121,6 +127,8 @@ class MainActivity : Activity() {
         root.addView(readButton, match())
         root.addView(codesButton, match())
         root.addView(vinButton, match())
+        root.addView(supportedButton, match())
+        root.addView(clearCodesButton, match())
         root.addView(firmwareButton, match())
         root.addView(adaptationsButton, match())
         root.addView(disconnectButton, match())
@@ -131,6 +139,8 @@ class MainActivity : Activity() {
         readButton.isEnabled = false
         codesButton.isEnabled = false
         vinButton.isEnabled = false
+        supportedButton.isEnabled = false
+        clearCodesButton.isEnabled = false
         disconnectButton.isEnabled = false
     }
 
@@ -143,26 +153,17 @@ class MainActivity : Activity() {
 
     private fun showAdaptations() {
         val items = arrayOf(
-            "Обучение дроссельной заслонки",
-            "Сброс адаптаций двигателя",
-            "Сервисные функции ABS",
-            "Сервисные функции АКПП",
-            "Идентификация ЭБУ"
+            "Идентификация ЭБУ двигателя (OBD-II)",
+            "Почему адаптации пока недоступны"
         )
         AlertDialog.Builder(this)
             .setTitle("Адаптации Kia Rio III")
             .setItems(items) { _, which ->
-                if (which == 4) {
+                if (which == 0) {
                     readEcuIdentification()
                     return@setItems
                 }
-                val details = when (which) {
-                    0 -> "Процедура может требоваться после очистки или замены дроссельного узла. Нужны точный тип ЭБУ и заводская процедура. Сейчас команда не отправляется."
-                    1 -> "Сброс доступен не для всех ЭБУ и не всегда необходим. Сначала нужно определить блок, прочитать его идентификаторы и проверить условия выполнения."
-                    2 -> "Функции ABS зависят от блока и могут включать специальные процедуры с требованиями безопасности. Сейчас доступна только подготовка раздела."
-                    3 -> "Поддержка зависит от наличия АКПП и конкретного блока управления коробкой. Тип коробки пока не подтверждён."
-                    else -> "Идентификация ЭБУ выполняется отдельным диагностическим запросом."
-                }
+                val details = "Стандартный ELM327 и универсальный OBD-II не дают подтверждённого доступа к фирменным процедурам Kia, ABS и отдельному блоку АКПП. Программа не будет имитировать эти функции: нужны точные идентификаторы блоков, совместимый интерфейс и проверенная заводская процедура."
                 AlertDialog.Builder(this)
                     .setTitle(items[which])
                     .setMessage("$details\n\nСтатус: пока информационный режим. Реальное выполнение будет включено только после проверки совместимости ЭБУ, адаптера и безопасной процедуры.")
@@ -311,6 +312,8 @@ class MainActivity : Activity() {
                     readButton.isEnabled = true
                     codesButton.isEnabled = true
                     vinButton.isEnabled = true
+                    supportedButton.isEnabled = true
+                    clearCodesButton.isEnabled = true
                     disconnectButton.isEnabled = true
                     values.text = "Адаптер подключён. Можно читать параметры и ошибки."
                 }
@@ -352,6 +355,74 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread { setStatus("Ошибка чтения: ${e.message}") }
+            }
+        }
+    }
+
+    private fun readSupportedPids() {
+        setStatus("Определение поддерживаемых PID…")
+        worker.execute {
+            try {
+                val supported = linkedSetOf<Int>()
+                val report = StringBuilder("Поддерживаемые параметры SAE J1979\\n\\n")
+                var base = 0
+                for (group in 0 until 4) {
+                    val raw = command("01%02X".format(base))
+                    val bytes = parseHexResponse(raw, "41%02X".format(base), 4)
+                    report.append("Группа 0x%02X: ".format(base))
+                    if (bytes == null) {
+                        report.append("нет ответа\\n")
+                        break
+                    }
+                    report.append("ответ получен\\n")
+                    for (bit in 0 until 32) {
+                        if ((bytes[bit / 8] and (1 shl (7 - bit % 8))) != 0) supported.add(base + bit + 1)
+                    }
+                    if ((bytes[3] and 1) == 0) break
+                    base += 0x20
+                }
+                val labels = mapOf(
+                    0x04 to "Расчётная нагрузка", 0x05 to "Температура ОЖ",
+                    0x0C to "Обороты двигателя", 0x0D to "Скорость",
+                    0x0F to "Температура впускного воздуха", 0x10 to "Расход воздуха",
+                    0x11 to "Положение дросселя", 0x1F to "Время работы двигателя",
+                    0x2F to "Уровень топлива", 0x42 to "Напряжение ЭБУ",
+                    0x46 to "Температура окружающего воздуха"
+                )
+                report.append("\\nОбнаруженные PID: ")
+                report.append(if (supported.isEmpty()) "не определены" else supported.sorted().joinToString { "0x%02X".format(it) })
+                report.append("\\n\\nПоддерживаемые известные параметры:\\n")
+                labels.forEach { (pid, label) -> if (pid in supported) report.append("• $label (PID 0x%02X)\\n".format(pid)) }
+                report.append("\\nПоддержка PID не гарантирует доступность каждого значения при любых условиях.")
+                runOnUiThread { values.text = report.toString(); setStatus("Проверка PID завершена") }
+            } catch (e: Exception) {
+                runOnUiThread { setStatus("Ошибка проверки PID: ${e.message}") }
+            }
+        }
+    }
+
+    private fun confirmClearCodes() {
+        AlertDialog.Builder(this)
+            .setTitle("Сбросить ошибки двигателя?")
+            .setMessage("Mode 04 очищает поддерживаемые эмиссионные коды и может сбросить readiness-мониторы. Сначала сохраните коды. Сброс не устраняет неисправность. Продолжить?")
+            .setNegativeButton("Отмена", null)
+            .setPositiveButton("Сбросить") { _, _ -> clearTroubleCodes() }
+            .show()
+    }
+
+    private fun clearTroubleCodes() {
+        setStatus("Отправка команды Mode 04…")
+        worker.execute {
+            try {
+                val raw = command("04")
+                val accepted = raw.uppercase().replace("[^0-9A-F]".toRegex(), "").contains("44")
+                runOnUiThread {
+                    values.text = "Ответ на очистку (Mode 04):\\n$raw\\n\\n" +
+                        if (accepted) "ЭБУ подтвердил положительный ответ 44. Повторно прочитайте ошибки." else "Подтверждение 44 не обнаружено. Сброс не подтверждён."
+                    setStatus(if (accepted) "Команда очистки подтверждена" else "Очистка не подтверждена")
+                }
+            } catch (e: Exception) {
+                runOnUiThread { setStatus("Ошибка очистки: ${e.message}") }
             }
         }
     }
@@ -520,6 +591,8 @@ class MainActivity : Activity() {
         readButton.isEnabled = false
         codesButton.isEnabled = false
         vinButton.isEnabled = false
+        supportedButton.isEnabled = false
+        clearCodesButton.isEnabled = false
         disconnectButton.isEnabled = false
         setStatus("Адаптер отключён вручную.")
         values.text = "Bluetooth-соединение закрыто."
