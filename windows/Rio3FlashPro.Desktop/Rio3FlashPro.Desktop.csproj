@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Rio3FlashPro.Desktop</RootNamespace>
-    <AssemblyName>Rio3FlashPro.Desktop</AssemblyName>
+    <AssemblyName>RioTechPro.Desktop</AssemblyName>
   </PropertyGroup>
 </Project>
