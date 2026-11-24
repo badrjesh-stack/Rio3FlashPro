@@ -45,6 +45,18 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        val connected = ObdSession.socket?.isConnected == true
+        readButton.isEnabled = connected
+        codesButton.isEnabled = connected
+        vinButton.isEnabled = connected
+        disconnectButton.isEnabled = connected
+        if (connected) {
+            setStatus("Подключено: ${ObdSession.deviceName ?: "ELM327"}. Фоновая сессия активна.")
+        }
+    }
+
     private fun buildScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
