@@ -1,4 +1,4 @@
-# Rio3FlashPro for Windows
+# RioTech Pro for Windows
 
 This folder is reserved for the Windows desktop client. The first Windows milestone is a buildable UI shell and diagnostic/session architecture; it does not yet communicate with Scanmatik or flash an ECU.
 
