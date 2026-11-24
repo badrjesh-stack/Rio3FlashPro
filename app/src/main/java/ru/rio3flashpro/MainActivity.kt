@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
 import java.io.File
@@ -63,6 +64,18 @@ class MainActivity : Activity() {
             setPadding(24, 28, 24, 24)
             setBackgroundColor(0xFFF3F5F8.toInt())
         }
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.ic_rio3flashpro)
+            contentDescription = "Логотип Rio3FlashPro"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                (144 * resources.displayMetrics.density).toInt(),
+                (144 * resources.displayMetrics.density).toInt()
+            ).apply {
+                gravity = Gravity.CENTER
+                bottomMargin = (10 * resources.displayMetrics.density).toInt()
+            }
+        }
         val title = TextView(this).apply {
             text = "Rio3FlashPro"
             textSize = 28f
@@ -100,6 +113,7 @@ class MainActivity : Activity() {
             textSize = 13f
             setPadding(4, 18, 4, 4)
         }
+        root.addView(logo)
         root.addView(title, match())
         root.addView(subtitle, match())
         root.addView(status, match())
