@@ -8,8 +8,8 @@
     <application
         android:allowBackup="false"
         android:label="Rio3FlashPro"
-        android:icon="@drawable-nodpi/rio3flashpro_logo"
-        android:roundIcon="@drawable-nodpi/rio3flashpro_logo"
+        android:icon="@drawable/rio3flashpro_logo"
+        android:roundIcon="@drawable/rio3flashpro_logo"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
         <service
