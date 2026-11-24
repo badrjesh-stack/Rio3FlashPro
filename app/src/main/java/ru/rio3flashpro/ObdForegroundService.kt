@@ -32,6 +32,10 @@ class ObdForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (ObdSession.socket?.isConnected != true) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val openApp = PendingIntent.getActivity(
             this,
             0,
